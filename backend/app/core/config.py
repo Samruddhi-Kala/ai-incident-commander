@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     RAG_TOP_K: int = 5
     KNOWLEDGE_BASE_DIR: str = "knowledge_base"
 
+    # Agent & LLM Orchestration Settings
+    LLM_PROVIDER: str = "fake"  # "fake" (deterministic offline), "openai", or "anthropic"
+    LLM_MODEL: str = "gpt-4o-mini"
+    LLM_API_KEY: Optional[str] = None
+    AGENT_MAX_ITERATIONS: int = 5
+    AGENT_MAX_TOOL_CALLS: int = 10
+
     # Future Configuration Placeholders (Do not hardcode production credentials)
     OPENAI_API_KEY: Optional[str] = None
     ANTHROPIC_API_KEY: Optional[str] = None

@@ -11,6 +11,7 @@ from app.repositories.document_repo import DocumentRepository
 from app.repositories.document_chunk_repo import DocumentChunkRepository
 from app.repositories.audit_log_repo import AuditLogRepository
 from app.repositories.tool_call_repo import ToolCallRepository
+from app.repositories.investigation_step_repo import InvestigationStepRepository
 
 __all__ = [
     "BaseRepository",
@@ -23,4 +24,5 @@ __all__ = [
     "DocumentChunkRepository",
     "AuditLogRepository",
     "ToolCallRepository",
+    "InvestigationStepRepository",
 ]

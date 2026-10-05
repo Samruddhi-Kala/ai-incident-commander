@@ -248,7 +248,172 @@ The platform includes a modular engineering tool adapter layer providing simulat
     }
   }
   ```
-* `POST /api/v1/tools/execute/batch` — Sequentially execute a batch of diagnostic tools.
+---
+
+## 🤖 LangGraph Agent Orchestrator (Phase 6)
+
+The platform features an automated AI investigation orchestrator built on **LangGraph**. It coordinates diagnostic reasoning across knowledge retrieval and live telemetry tools to produce evidence-backed root cause analyses without human intervention.
+
+### 🛡️ Critical Safety Boundary
+
+> **IMPORTANT**: Phase 6 provides **diagnostic AI orchestration only**. 
+> The agent is strictly read-only: it retrieves runbooks, invokes read-only telemetry and diagnostic tools, collects empirical evidence, formulates and verifies competing failure hypotheses, and recommends remediation proposals.
+> **Remediation actions (rollbacks, restarts, database changes, infrastructure mutations) and human approval workflows are intentionally deferred to Phase 7.**
+> There are no action-execution or automated-remediation nodes in this phase.
+
+### Investigation Architecture
+
+```text
+                    INCIDENT TRIGGER
+                           │
+                           ▼
+                  ┌─────────────────┐
+                  │ 1. Intake Node  │
+                  └────────┬────────┘
+                           │
+                           ▼
+                  ┌─────────────────┐
+                  │ 2. Planner Node │
+                  └────────┬────────┘
+                           │
+         ┌─────────────────┴─────────────────┐
+         ▼                                   ▼
+┌──────────────────┐               ┌───────────────────┐
+│   3. RAG Node    │               │  4. Tools Node    │
+│(Runbooks/History)│               │(Telemetry/Metrics)│
+└────────┬─────────┘               └─────────┬─────────┘
+         │                                   │
+         └─────────────────┬─────────────────┘
+                           ▼
+                  ┌─────────────────┐
+                  │ 5. Evidence Node│
+                  └────────┬────────┘
+                           │
+                           ▼
+                  ┌─────────────────┐
+                  │ 6. Hypotheses   │
+                  └────────┬────────┘
+                           │
+                           ▼
+                  ┌─────────────────┐
+                  │ 7. Verification │
+                  └────────┬────────┘
+                           │
+             Need More Evidence? (Loop Guard)
+             ├── YES (iter < max) ──► 4. Tools Node
+             └── NO  ───────────────► 8. Root Cause Node
+                           │
+                           ▼
+                  ┌─────────────────┐
+                  │ 8. Root Cause   │
+                  │    Synthesis    │
+                  └────────┬────────┘
+                           │
+                           ▼
+                 INVESTIGATION RESULT
+```
+
+### Graph Nodes
+
+1. **Intake Node** (`app.agent.nodes.intake`): Loads incident, resolves service metadata and dependencies, initializes or attaches the active investigation session (`INV-XXXX`), and records Step 1 in `investigation_steps`.
+2. **Planner Node** (`app.agent.nodes.planner`): Analyzes incident context using the LLM to generate a structured `InvestigationPlan` containing diagnostic questions, required tools, and RAG search queries.
+3. **RAG Node** (`app.agent.nodes.rag`): Invokes the existing `RAGService` to retrieve relevant runbooks, architecture topology, and past incident postmortems with full source attribution.
+4. **Tools Node** (`app.agent.nodes.tools`): Validates planned tools against `ToolRegistry`, rejects unknown tools safely, and executes registered tools via `ToolService`, persisting records to `tool_calls` and `audit_logs`.
+5. **Evidence Node** (`app.agent.nodes.evidence`): Converts raw tool execution results into structured `Evidence` entities with relevance scores, persisted in the database.
+6. **Hypotheses Node** (`app.agent.nodes.hypotheses`): Uses the LLM to generate multiple competing failure theories (`HypothesisItem`), persisted in `hypotheses`.
+7. **Verification Node** (`app.agent.nodes.verification`): Tests hypotheses against empirical evidence, updates confidence scores and statuses (`Verified_Strong`, `Verified_Weak`, `Ruled_Out`), and evaluates if further diagnostic iterations are required.
+8. **Root Cause Node** (`app.agent.nodes.root_cause`): Synthesizes the probable root cause, overall confidence score, alternative explanations, and non-executable remediation proposals, updating the `investigations` table to `Completed`.
+
+### Agent State Schema (`InvestigationState`)
+
+```python
+class InvestigationState(TypedDict):
+    incident_id: str
+    investigation_id: str
+    investigation_number: str
+    title: str
+    description: str
+    severity: str
+    status: str
+    service_name: Optional[str]
+    service_tier: Optional[str]
+    service_dependencies: List[str]
+    investigation_plan: Optional[Dict[str, Any]]
+    retrieved_context: Optional[str]
+    retrieved_sources: List[Dict[str, Any]]
+    selected_tools: List[Dict[str, Any]]
+    tool_results: List[Dict[str, Any]]
+    tool_calls_count: int
+    iteration_count: int
+    max_iterations: int
+    need_more_evidence: bool
+    evidence: List[Dict[str, Any]]
+    hypotheses: List[Dict[str, Any]]
+    verification_results: List[Dict[str, Any]]
+    probable_root_cause: Optional[str]
+    confidence: Optional[float]
+    recommended_remediation: List[str]
+    analysis_reasoning: Optional[str]
+    current_step: str
+    status_outcome: str
+    errors: List[str]
+```
+
+### Configuration Options
+
+| Variable | Default | Description |
+| :--- | :--- | :--- |
+| `LLM_PROVIDER` | `fake` | LLM backend: `fake` (deterministic offline reasoning for tests/dev), `openai`, `anthropic` |
+| `LLM_MODEL` | `gpt-4o-mini` | Model identifier when using external providers |
+| `LLM_API_KEY` | `""` | API key for external LLM provider |
+| `AGENT_MAX_ITERATIONS` | `5` | Maximum evidence gathering feedback loops before forced conclusion |
+| `AGENT_MAX_TOOL_CALLS` | `10` | Hard cap on total tool calls across an entire investigation |
+
+### Investigation REST API
+
+* `POST /api/v1/investigations/{incident_id}/run` — Trigger automated LangGraph investigation:
+  ```json
+  {
+    "max_iterations": 3
+  }
+  ```
+  Returns full structured investigation findings, diagnostic steps, evidence, hypotheses, and root cause.
+* `GET /api/v1/investigations/{incident_id}` — Retrieve active or completed investigation details.
+
+### Example Investigation Response
+
+```json
+{
+  "investigation_id": "b765a624-9de6-4202-9f24-5676439307a8",
+  "incident_id": "61306724-0605-4253-97f8-e04b526e00ce",
+  "investigation_number": "INV-9873",
+  "status": "Completed",
+  "probable_root_cause": "Deployment regression in payment-service (v2.5.1 / commit a1b2c3d4e5f6) introduced misconfigured connection pool sizing and memory exhaustion, resulting in saturated database connection pools, container OOM kills, and cascading HTTP 504 timeouts.",
+  "confidence_score": 0.88,
+  "recommended_remediation": [
+    "Roll back payment-service deployment from v2.5.1 to previous stable release v2.5.0.",
+    "Revert commit a1b2c3d4e5f6 connection pool sizing adjustments.",
+    "Restart degraded pod replicas after rollback to restore healthy capacity."
+  ],
+  "steps": [
+    {"step_order": 1, "title": "Step 1 — Incident Intake & Context Normalization", "status": "Completed"},
+    {"step_order": 2, "title": "Step 2 — Diagnostic Planning", "status": "Completed"},
+    {"step_order": 3, "title": "Step 3 — Organizational Knowledge Retrieval", "status": "Completed"},
+    {"step_order": 4, "title": "Step 4 — Diagnostic Telemetry Collection", "status": "Completed"},
+    {"step_order": 5, "title": "Step 5 — Evidence Extraction & Correlation", "status": "Completed"},
+    {"step_order": 6, "title": "Step 6 — Competing Hypotheses Formulation", "status": "Completed"},
+    {"step_order": 7, "title": "Step 7 — Hypothesis Verification & Evidence Correlation", "status": "Completed"},
+    {"step_order": 8, "title": "Step 8 — Root Cause Synthesis & Remediation Guidance", "status": "Completed"}
+  ],
+  "evidence": [
+    {"source_tool": "get_error_rate", "summary": "Error rate currently observed at 15.3% (baseline: 1.0%).", "relevance_score": 0.9},
+    {"source_tool": "get_recent_deployments", "summary": "Recent deployment 'v2.5.1' deployed to production at 20m ago.", "relevance_score": 0.9}
+  ],
+  "hypotheses": [
+    {"status": "Verified_Strong", "confidence_score": 0.88, "hypothesis_text": "Recent software deployment introduced connection exhaustion and latency spike in payment-service: ..."}
+  ]
+}
+```
 
 ---
 
@@ -259,7 +424,7 @@ The platform includes a modular engineering tool adapter layer providing simulat
 | **Backend Framework** | Python 3.11+ / FastAPI | Async REST API gateway |
 | **Knowledge Engine (RAG)** | Custom Chunking + pgvector | Document parsing, HNSW vector search, full-text retrieval |
 | **Engineering Tools** | 5 Simulated Domain Adapters + Registry | Diagnostic tool calling interface with LLM schema generation |
-| **Agent Orchestration** | LangGraph *(Future Phase)* | Stateful, graph-based agent workflow management |
+| **Agent Orchestration** | LangGraph | Stateful, graph-based agent workflow management |
 | **Database & Vector Store** | PostgreSQL 16 + `pgvector` | Primary database for relational data, JSONB logs, and vector embeddings |
 | **Cache & Queue** | Redis | Session state, tool response caching, and agent checkpointing |
 | **Migration Engine** | Alembic | Database schema migrations |
@@ -275,7 +440,7 @@ Phase 1 completed:
 Project foundation and development infrastructure.
 
 Phase 2 completed:
-Database layer: 12 SQLAlchemy 2.0 ORM models, Alembic migrations (001 & 002),
+Database layer: 12 SQLAlchemy 2.0 ORM models, Alembic migrations (001, 002, 003),
 lightweight Repository layer, development seeding mechanism, and database tests.
 
 Phase 3 completed:
@@ -293,10 +458,18 @@ Phase 5 completed:
 Simulated Engineering Tools & Telemetry Adapters: 5 domain adapters (Observability, Deployment,
 Git, Incident History, Infrastructure) providing 14 diagnostic tools, BaseToolAdapter with latency
 tracking and error handling, central ToolRegistry with discovery, dispatch, and LLM function-calling
-schema generation, REST endpoints (/api/v1/tools/), and 63 unit and integration tests.
+schema generation, REST endpoints (/api/v1/tools/), tool execution persistence into tool_calls and
+audit_logs, and 63 unit and integration tests.
+
+Phase 6 completed:
+LangGraph Agent Orchestrator: Stateful, inspectable LangGraph investigation StateGraph with 8 modular
+nodes (Intake, Planner, RAG, Tools, Evidence, Hypotheses, Verification, Root Cause), structured Pydantic
+reasoning outputs, deterministic offline LLM reasoning engine for testing/local dev, loop guards for
+max-iteration and tool-call limits, full transactional database persistence across all 6 investigation tables,
+API endpoints (POST /api/v1/investigations/{incident_id}/run, GET /api/v1/investigations/{incident_id}),
+and 19 unit, integration, and API tests with 100% pass rate.
 
 Not implemented yet:
-LangGraph agent orchestrator (Phase 6)
 Remediation execution & approval engine (Phase 7)
 Authentication & Authorization
 React frontend (Phase 8)

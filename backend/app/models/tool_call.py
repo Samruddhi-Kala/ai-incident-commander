@@ -21,10 +21,10 @@ class ToolCall(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
-    investigation_id: Mapped[uuid.UUID] = mapped_column(
+    investigation_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("investigations.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
     tool_name: Mapped[str] = mapped_column(
@@ -56,7 +56,7 @@ class ToolCall(Base):
     )
 
     # Relationships
-    investigation: Mapped["Investigation"] = relationship(
+    investigation: Mapped[Optional["Investigation"]] = relationship(
         "Investigation",
         back_populates="tool_calls",
     )

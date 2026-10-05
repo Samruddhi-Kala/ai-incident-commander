@@ -214,12 +214,51 @@ python -m app.rag.ingest --dir path/to/custom_docs
 
 ---
 
+## 🔧 Simulated Engineering Tools & Telemetry Adapters (Phase 5)
+
+The platform includes a modular engineering tool adapter layer providing simulated diagnostic tools across five operational domains. The tools simulate real-world observability, deployment, source control, incident history, and infrastructure systems with deterministic scenarios (including the `payment-service` degradation and memory-exhaustion scenario).
+
+### Tool Adapters & Capabilities (14 Tools across 5 Domains)
+
+| Domain | Adapter | Tools | Description |
+| :--- | :--- | :--- | :--- |
+| **Observability** | `ObservabilityAdapter` | `get_metrics`, `search_logs`, `get_error_rate`, `get_latency` | Metric time-series, log searching with level/text filters, error rates, latency percentiles (p50/p90/p95/p99) |
+| **Deployment** | `DeploymentAdapter` | `get_recent_deployments`, `get_deployment_details`, `compare_deployments` | Deployment history, release metadata, commit SHAs, and configuration diff comparison |
+| **Source Control** | `GitAdapter` | `get_recent_commits`, `get_commit_details`, `search_code_changes` | Git commits, unified file diffs, author info, and message/file search |
+| **Incident History** | `IncidentHistoryAdapter` | `search_previous_incidents` | Historical incident search with keyword matching, severity filtering, and recurring pattern detection |
+| **Infrastructure** | `InfrastructureAdapter` | `get_service_health`, `get_service_dependencies`, `get_database_status` | Kubernetes pod statuses, container resource metrics, active alerts, dependency graphs, and database connection pools |
+
+### Central Tool Registry & LLM Function Calling
+
+* **`ToolRegistry`**: Central singleton registry for tool discovery, dispatch, domain querying, and execution latency tracking.
+* **LLM Schema Generation**: Automatically inspects adapter method signatures and docstrings to produce structured tool schemas ready for LLM function calling (OpenAI, Anthropic, LangChain/LangGraph).
+* **Deterministic Test Scenario**: Includes a coordinated incident scenario (`payment-service` degraded due to connection pool exhaustion and OOM errors following release `v2.5.1` / commit `a1b2c3d4e5f6`).
+
+### Tools REST APIs
+
+* `GET  /api/v1/tools/` — Catalog of all registered diagnostic tools and domains.
+* `GET  /api/v1/tools/schemas` — LLM function calling schema definitions for all tools.
+* `POST /api/v1/tools/execute` — Execute a single diagnostic tool with arguments:
+  ```json
+  {
+    "tool_name": "get_error_rate",
+    "arguments": {
+      "service_name": "payment-service",
+      "minutes": 30
+    }
+  }
+  ```
+* `POST /api/v1/tools/execute/batch` — Sequentially execute a batch of diagnostic tools.
+
+---
+
 ## 🛠️ Technology Stack
 
 | Domain | Technology Stack | Purpose |
 | :--- | :--- | :--- |
 | **Backend Framework** | Python 3.11+ / FastAPI | Async REST API gateway |
 | **Knowledge Engine (RAG)** | Custom Chunking + pgvector | Document parsing, HNSW vector search, full-text retrieval |
+| **Engineering Tools** | 5 Simulated Domain Adapters + Registry | Diagnostic tool calling interface with LLM schema generation |
 | **Agent Orchestration** | LangGraph *(Future Phase)* | Stateful, graph-based agent workflow management |
 | **Database & Vector Store** | PostgreSQL 16 + `pgvector` | Primary database for relational data, JSONB logs, and vector embeddings |
 | **Cache & Queue** | Redis | Session state, tool response caching, and agent checkpointing |
@@ -250,10 +289,16 @@ heading-aware chunking with metadata breadcrumbs, embedding service abstraction 
 deterministic fake embeddings), PostgreSQL + pgvector vector similarity search, full-text search,
 hybrid retrieval, citation context builder, CLI ingestion tool, and RAG search/ingest APIs.
 
+Phase 5 completed:
+Simulated Engineering Tools & Telemetry Adapters: 5 domain adapters (Observability, Deployment,
+Git, Incident History, Infrastructure) providing 14 diagnostic tools, BaseToolAdapter with latency
+tracking and error handling, central ToolRegistry with discovery, dispatch, and LLM function-calling
+schema generation, REST endpoints (/api/v1/tools/), and 63 unit and integration tests.
+
 Not implemented yet:
-LangGraph agent orchestrator
-Simulated engineering tools & tool calling
-Remediation execution
+LangGraph agent orchestrator (Phase 6)
+Remediation execution & approval engine (Phase 7)
 Authentication & Authorization
-React frontend
+React frontend (Phase 8)
 ```
+

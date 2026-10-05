@@ -5,6 +5,18 @@ from app.schemas.common import PaginationParams, PaginatedResponse
 from app.schemas.service import ServiceCreate, ServiceUpdate, ServiceResponse, ServiceListResponse
 from app.schemas.investigation import InvestigationResponse
 from app.schemas.incident import IncidentCreate, IncidentIngest, IncidentUpdate, IncidentResponse, IncidentListResponse
+from app.schemas.remediation import (
+    RemediationStatus,
+    RiskLevel,
+    RemediationActionType,
+    RemediationActionCreate,
+    RemediationApprovalRequest,
+    RemediationRejectionRequest,
+    RemediationSubmitRequest,
+    RemediationExecutionResult,
+    RemediationActionResponse,
+    RemediationListResponse,
+)
 
 __all__ = [
     "PaginationParams",
@@ -19,4 +31,14 @@ __all__ = [
     "IncidentUpdate",
     "IncidentResponse",
     "IncidentListResponse",
+    "RemediationStatus",
+    "RiskLevel",
+    "RemediationActionType",
+    "RemediationActionCreate",
+    "RemediationApprovalRequest",
+    "RemediationRejectionRequest",
+    "RemediationSubmitRequest",
+    "RemediationExecutionResult",
+    "RemediationActionResponse",
+    "RemediationListResponse",
 ]

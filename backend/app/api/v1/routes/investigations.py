@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.services.incident_service import IncidentService
 from app.services.investigation_service import InvestigationService
+from app.services.remediation_service import RemediationService
+from app.schemas.remediation import RemediationListResponse, RemediationActionResponse
 from app.agent.graph import run_investigation_workflow
 from app.agent.schemas import (
     InvestigationRunRequest,
@@ -219,3 +221,48 @@ def get_investigation(
 
     db.refresh(investigation)
     return _format_investigation_response(investigation=investigation)
+
+
+@router.get(
+    "/{investigation_id}/remediations",
+    response_model=RemediationListResponse,
+    status_code=status.HTTP_200_OK,
+    summary="List all remediation proposals for an investigation",
+)
+def list_investigation_remediations(
+    investigation_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    """
+    List all remediation action proposals associated with the specified investigation.
+    """
+    remediation_svc = RemediationService(db)
+    actions = remediation_svc.list_by_investigation(investigation_id)
+    return RemediationListResponse(
+        items=[RemediationActionResponse.model_validate(a) for a in actions],
+        total=len(actions),
+    )
+
+
+@router.post(
+    "/{investigation_id}/remediations/propose",
+    response_model=RemediationListResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Generate remediation proposals from investigation recommendations",
+)
+def propose_investigation_remediations(
+    investigation_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    """
+    Examines investigation conclusions and converts recommended remediation advice into
+    formal RemediationAction proposals in PROPOSED status.
+    AI creates proposals only; actions cannot execute without human approval.
+    """
+    remediation_svc = RemediationService(db)
+    proposals = remediation_svc.create_proposals_from_investigation(investigation_id)
+    return RemediationListResponse(
+        items=[RemediationActionResponse.model_validate(p) for p in proposals],
+        total=len(proposals),
+    )
+

@@ -417,6 +417,53 @@ class InvestigationState(TypedDict):
 
 ---
 
+## 🛡️ Remediation & Human Approval Engine (Phase 7)
+
+Phase 7 introduces a safe, human-in-the-loop remediation lifecycle where the AI proposes corrective actions, but consequential executions require explicit human authorization.
+
+### Core Architecture & Philosophy
+```text
+  Investigation (Phase 6)
+          ↓
+  Recommended Remediation (Advisory Text)
+          ↓
+  Remediation Proposal (PROPOSED)
+          ↓
+  Submit for Authorization (PENDING_APPROVAL)
+          ↓
+   ┌──────┴──────┐
+   ↓             ↓
+APPROVED      REJECTED (Execution Blocked)
+   ↓
+EXECUTING (Simulated, Deterministic)
+   ↓
+ ┌──────┴──────┐
+ ↓             ↓
+COMPLETED    FAILED
+```
+
+* **AI Recommends, Human Approves**: AI agents operate under a strict diagnostic boundary. The system will **never** execute an unapproved remediation action autonomously. AI self-approval (`actor_type="SYSTEM_AGENT"`) is strictly rejected.
+* **Registered Simulated Actions**:
+  - `restart_service`: Simulates rolling graceful restart of target service instances.
+  - `rollback_deployment`: Simulates rolling back to a verified prior release artifact.
+  - `scale_service`: Simulates horizontal pod autoscaler / replica scaling (1–100 replicas).
+  - `clear_cache`: Simulates flushing Redis or in-memory application cache clusters.
+* **Zero Infrastructure Side-Effects**: All remediation actions are simulated in software. They do not execute shell commands, invoke `subprocess`, or connect to production cloud APIs (AWS, Kubernetes, Docker).
+* **Strict State Machine**: Prohibits invalid transitions (e.g., `REJECTED → EXECUTING`, `PENDING_APPROVAL → EXECUTING`, `COMPLETED → EXECUTING`, `REJECTED → APPROVED`).
+* **Transactional Audit Trail**: Every lifecycle transition (`remediation.proposed`, `remediation.submitted_for_approval`, `remediation.approved`, `remediation.rejected`, `remediation.execution_started`, `remediation.execution_completed`, `remediation.execution_failed`) is transactionally recorded in the `audit_logs` table.
+
+### Remediation REST API Endpoints
+* `POST /api/v1/remediations` — Create a new remediation proposal in `PROPOSED` status.
+* `GET  /api/v1/remediations/{id}` — Retrieve full remediation action status, parameters, and results.
+* `GET  /api/v1/investigations/{id}/remediations` — List all proposals associated with an investigation session.
+* `POST /api/v1/remediations/{id}/submit` — Transition proposal from `PROPOSED` to `PENDING_APPROVAL`.
+* `POST /api/v1/remediations/{id}/approve` — Human authorization of a pending action (`PENDING_APPROVAL` → `APPROVED`).
+* `POST /api/v1/remediations/{id}/reject` — Rejection of a pending action (`PENDING_APPROVAL` → `REJECTED`).
+* `POST /api/v1/remediations/{id}/execute` — Execute an `APPROVED` action safely in simulation mode.
+* `POST /api/v1/investigations/{id}/remediations/propose` — Formulate remediation proposals automatically from Phase 6 investigation conclusions.
+
+---
+
 ## 🛠️ Technology Stack
 
 | Domain | Technology Stack | Purpose |
@@ -425,6 +472,7 @@ class InvestigationState(TypedDict):
 | **Knowledge Engine (RAG)** | Custom Chunking + pgvector | Document parsing, HNSW vector search, full-text retrieval |
 | **Engineering Tools** | 5 Simulated Domain Adapters + Registry | Diagnostic tool calling interface with LLM schema generation |
 | **Agent Orchestration** | LangGraph | Stateful, graph-based agent workflow management |
+| **Remediation & HITL** | RemediationRegistry + RemediationService | Human-in-the-loop authorization barrier and simulated safe execution |
 | **Database & Vector Store** | PostgreSQL 16 + `pgvector` | Primary database for relational data, JSONB logs, and vector embeddings |
 | **Cache & Queue** | Redis | Session state, tool response caching, and agent checkpointing |
 | **Migration Engine** | Alembic | Database schema migrations |
@@ -467,11 +515,19 @@ nodes (Intake, Planner, RAG, Tools, Evidence, Hypotheses, Verification, Root Cau
 reasoning outputs, deterministic offline LLM reasoning engine for testing/local dev, loop guards for
 max-iteration and tool-call limits, full transactional database persistence across all 6 investigation tables,
 API endpoints (POST /api/v1/investigations/{incident_id}/run, GET /api/v1/investigations/{incident_id}),
-and 19 unit, integration, and API tests with 100% pass rate.
+and 23 unit, integration, and API tests with 100% pass rate.
+
+Phase 7 completed:
+Human Approval & Remediation Engine: Safe, human-in-the-loop remediation lifecycle (PROPOSED →
+PENDING_APPROVAL → APPROVED/REJECTED → EXECUTING → COMPLETED/FAILED), strict authorization barriers
+(AI self-approval prohibited, unapproved execution blocked), simulated execution catalog (restart_service,
+rollback_deployment, scale_service, clear_cache) with zero real infrastructure mutation, transactional
+audit trail logging for every lifecycle event, Phase 6 integration (converting recommendations to proposals),
+comprehensive REST APIs (/api/v1/remediations), and 29 unit, integration, and API tests (172 total backend tests).
 
 Not implemented yet:
-Remediation execution & approval engine (Phase 7)
-Authentication & Authorization
 React frontend (Phase 8)
+Postmortem & Evaluation (Phase 9)
 ```
+
 

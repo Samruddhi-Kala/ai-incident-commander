@@ -49,9 +49,9 @@ class RemediationAction(Base):
     approval_status: Mapped[str] = mapped_column(
         String(30),
         nullable=False,
-        default="PENDING",
+        default="PROPOSED",
         index=True,
-    )  # PENDING, APPROVED, REJECTED, EXPIRED
+    )  # PROPOSED, PENDING_APPROVAL, APPROVED, REJECTED, EXECUTING, COMPLETED, FAILED
     approved_by: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),

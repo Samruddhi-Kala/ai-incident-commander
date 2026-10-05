@@ -22,6 +22,12 @@ class BaseRepository(Generic[ModelType]):
         """
         return self.db.get(self.model, id)
 
+    def get(self, id: uuid.UUID) -> Optional[ModelType]:
+        """
+        Alias for get_by_id.
+        """
+        return self.get_by_id(id)
+
     def list(self, skip: int = 0, limit: int = 100) -> List[ModelType]:
         """
         Lists model instances with pagination offset and limit.

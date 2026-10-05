@@ -17,6 +17,13 @@ class DocumentRepository(BaseRepository[Document]):
         statement = select(Document).where(Document.content_hash == content_hash)
         return self.db.scalars(statement).first()
 
+    def get_by_file_path(self, file_path: str) -> Optional[Document]:
+        """
+        Get document by source file path.
+        """
+        statement = select(Document).where(Document.file_path == file_path)
+        return self.db.scalars(statement).first()
+
     def list_by_category(self, category: str) -> List[Document]:
         """
         List documents by category (runbook, architecture, incident, policy).

@@ -1042,3 +1042,98 @@ def test_api_propose_from_investigation_endpoint_unrecognized(client, db_session
     assert data["total"] == 0
     assert data["items"] == []
 
+
+def test_api_list_remediations_pagination_and_total_count(client, db_session, test_setup):
+    """
+    Test GET /api/v1/remediations respects skip and limit, and total represents
+    the actual count of matching records.
+    """
+    inv = test_setup["investigation"]
+    # Create 3 distinct remediation proposals
+    actions = []
+    for i in range(3):
+        r = RemediationAction(
+            investigation_id=inv.id,
+            action_name="restart_service",
+            parameters={"service": f"service-{i}"},
+            reasoning=f"Reason {i}",
+            risk_level="LOW",
+            approval_status="PROPOSED",
+        )
+        db_session.add(r)
+        actions.append(r)
+    db_session.commit()
+
+    # Query all with default pagination
+    res_all = client.get("/api/v1/remediations")
+    assert res_all.status_code == 200
+    data_all = res_all.json()
+    total_records = data_all["total"]
+    assert total_records >= 3
+
+    # Query with skip=1, limit=1
+    res_paginated = client.get("/api/v1/remediations?skip=1&limit=1")
+    assert res_paginated.status_code == 200
+    data_paginated = res_paginated.json()
+    assert len(data_paginated["items"]) == 1
+    # total must reflect the overall count of matching records, not the page slice size
+    assert data_paginated["total"] == total_records
+
+
+def test_api_list_remediations_status_filter_and_total_count(client, db_session, test_setup):
+    """
+    Test GET /api/v1/remediations with status filter returns only matching items,
+    respects skip and limit, and total represents the actual count of matching status records.
+    """
+    inv = test_setup["investigation"]
+    # Add 2 with PROPOSED, 1 with APPROVED
+    p1 = RemediationAction(
+        investigation_id=inv.id,
+        action_name="restart_service",
+        parameters={"service": "auth-service"},
+        reasoning="Auth service memory leak",
+        risk_level="LOW",
+        approval_status="PROPOSED",
+    )
+    p2 = RemediationAction(
+        investigation_id=inv.id,
+        action_name="clear_cache",
+        parameters={"service": "cache-service"},
+        reasoning="Stale keys",
+        risk_level="LOW",
+        approval_status="PROPOSED",
+    )
+    p3 = RemediationAction(
+        investigation_id=inv.id,
+        action_name="scale_service",
+        parameters={"service": "worker-service", "replicas": 4},
+        reasoning="High queue backlog",
+        risk_level="MEDIUM",
+        approval_status="APPROVED",
+    )
+    db_session.add_all([p1, p2, p3])
+    db_session.commit()
+
+    # Filter for APPROVED
+    res_approved = client.get("/api/v1/remediations?status=APPROVED")
+    assert res_approved.status_code == 200
+    data_approved = res_approved.json()
+    assert data_approved["total"] >= 1
+    for item in data_approved["items"]:
+        assert item["approval_status"] == "APPROVED"
+
+    # Filter for PROPOSED with pagination skip=1, limit=1
+    res_prop_all = client.get("/api/v1/remediations?status=PROPOSED")
+    assert res_prop_all.status_code == 200
+    total_proposed = res_prop_all.json()["total"]
+    assert total_proposed >= 2
+
+    res_prop_page = client.get("/api/v1/remediations?status=PROPOSED&skip=1&limit=1")
+    assert res_prop_page.status_code == 200
+    data_prop_page = res_prop_page.json()
+    assert len(data_prop_page["items"]) == 1
+    assert data_prop_page["items"][0]["approval_status"] == "PROPOSED"
+    # total must equal the total number of PROPOSED records, NOT 1 (the slice size)
+    assert data_prop_page["total"] == total_proposed
+
+

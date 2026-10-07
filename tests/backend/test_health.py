@@ -44,3 +44,22 @@ def test_redis_health_endpoint_format(client):
     data = response.json()
     assert "status" in data
     assert "redis" in data
+
+
+def test_cors_allowed_origin(client):
+    """
+    Verify configured frontend origins receive proper CORS headers.
+    """
+    response = client.get("/", headers={"Origin": "http://localhost:5173"})
+    assert response.status_code == status.HTTP_200_OK
+    assert response.headers.get("access-control-allow-origin") == "http://localhost:5173"
+
+
+def test_cors_disallowed_origin(client):
+    """
+    Verify untrusted origins do not receive CORS allow headers.
+    """
+    response = client.get("/", headers={"Origin": "http://malicious-origin.com"})
+    assert response.status_code == status.HTTP_200_OK
+    assert response.headers.get("access-control-allow-origin") is None
+

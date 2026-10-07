@@ -12,7 +12,7 @@ Enforces:
 """
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy.orm import Session
 from app.models.remediation_action import RemediationAction
 from app.models.investigation import Investigation
@@ -90,6 +90,15 @@ class RemediationService:
                 details={"investigation_id": str(investigation_id)},
             )
         return self.remediation_repo.list_by_investigation(investigation_id)
+
+    def list_all(
+        self,
+        skip: int = 0,
+        limit: int = 50,
+        status: Optional[str] = None,
+    ) -> Tuple[List[RemediationAction], int]:
+        """List all remediation actions across all investigations, returning (items, total_count)."""
+        return self.remediation_repo.list_with_count(skip=skip, limit=limit, status=status)
 
     # -------------------------------------------------------------------------
     # 1. Proposal Creation (PROPOSED)

@@ -476,7 +476,7 @@ COMPLETED    FAILED
 | **Database & Vector Store** | PostgreSQL 16 + `pgvector` | Primary database for relational data, JSONB logs, and vector embeddings |
 | **Cache & Queue** | Redis | Session state, tool response caching, and agent checkpointing |
 | **Migration Engine** | Alembic | Database schema migrations |
-| **Frontend UI** | React 18 + TypeScript *(Future Phase)* | Single-page application dashboard |
+| **Frontend UI** | React 18 + TypeScript + Vite + Tailwind CSS | Operations dashboard for incidents, investigations, and HITL remediation |
 | **Environment** | Docker & Docker Compose | Local containerized setup |
 
 ---
@@ -523,11 +523,84 @@ PENDING_APPROVAL → APPROVED/REJECTED → EXECUTING → COMPLETED/FAILED), stri
 (AI self-approval prohibited, unapproved execution blocked), simulated execution catalog (restart_service,
 rollback_deployment, scale_service, clear_cache) with zero real infrastructure mutation, transactional
 audit trail logging for every lifecycle event, Phase 6 integration (converting recommendations to proposals),
-comprehensive REST APIs (/api/v1/remediations), and 29 unit, integration, and API tests (172 total backend tests).
+comprehensive REST APIs (/api/v1/remediations), and 29 unit, integration, and API tests (179 total backend tests).
+
+Phase 8 completed:
+React Frontend Dashboard: Production-inspired dark operations console built with React 18, TypeScript,
+Vite, Tailwind CSS, and React Router. Complete console interface with:
+- Persistent AppShell, Sidebar, and Live Header telemetry
+- Overview/Dashboard with live metrics derived from real backend data (active, SEV-1, in-progress, pending)
+- Incident Console with multi-criteria filtering (Severity, Status, Search) and detailed inspection views
+- Investigation Detail Console with:
+  * InvestigationHeader (metadata and Root Cause Confidence meter)
+  * RootCausePanel (probable root cause, reasoning, evidence, and Inconclusive state handling)
+  * RemediationRecommendations (Phase 6 guidance with 'Create Remediation Proposals' trigger)
+  * InvestigationTimeline (all 8 sequential execution steps)
+  * KnowledgeSources (RAG runbooks and postmortems with scores and text snippets)
+  * ToolCallsList (expandable arguments and telemetry output payloads with execution latencies)
+  * EvidenceList (empirical telemetry observations with relevance scores)
+  * HypothesisList (competing causal hypotheses with supporting/opposing evidence)
+- Remediation Governance Console with:
+  * Lifecycle stepper: PROPOSED → PENDING_APPROVAL → APPROVED → EXECUTING → COMPLETED/REJECTED/FAILED
+  * Parameter specifications, technical justification, expected impact, and rollback plan
+  * Human authorization boundary: Approval modal with high-risk confirmation warnings
+  * Rejection modal requiring mandatory justification reason (preventing empty rejection)
+  * Execution controller: Gated strictly to APPROVED status with prominent 'SIMULATED EXECUTION' label
+- Centralized Axios API client with typed models, custom hooks, and controlled polling (stopping on terminal states)
+- 15 frontend unit and component tests with 100% pass rate (Vitest + Testing Library)
+- Production bundle verification (tsc + vite build passed cleanly)
 
 Not implemented yet:
-React frontend (Phase 8)
 Postmortem & Evaluation (Phase 9)
 ```
+
+---
+
+## 🖥️ Phase 8 — React Frontend Dashboard
+
+### Technology Stack
+- **Framework**: React 18 + TypeScript + Vite
+- **Styling**: Tailwind CSS (dark operations-console aesthetic with semantic color palette)
+- **Routing**: React Router v6
+- **HTTP Client**: Centralized Axios client (`frontend/src/api/client.ts`)
+- **Icons**: Lucide React
+- **Testing**: Vitest + React Testing Library + jsdom
+
+### Application Routes
+- `/` — Command Center Overview (active incidents, SEV-1 alerts, investigations in progress, pending approvals)
+- `/incidents` — Incident Console (filterable telemetry table with search, severity, and status filters)
+- `/incidents/:incidentId` — Incident Detail (alert telemetry context, service topology, "Start AI Investigation" / "View Investigation")
+- `/incidents/:incidentId/investigation` — Investigation Deep Dive (timeline, root cause, RAG sources, tool calls, evidence, competing hypotheses, recommendations)
+- `/remediations` — Remediation Governance Console (filterable list of all remediation proposals)
+- `/remediations/:remediationId` — Remediation Action Detail (lifecycle stepper, approval modal, rejection modal, and gated execution controller)
+
+### Running the Dashboard Locally
+
+1. **Start the backend stack**:
+   ```bash
+   # Ensure Docker containers are running
+   docker compose up -d
+
+   # Start FastAPI server
+   .\.venv\Scripts\uvicorn.exe app.main:app --host 127.0.0.1 --port 8000 --reload
+   ```
+
+2. **Start the React frontend**:
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+   Open `http://localhost:5173` in your browser. Vite proxies `/api` requests directly to `http://127.0.0.1:8000`.
+
+3. **Run Frontend Tests and Build**:
+   ```bash
+   cd frontend
+   npm run test     # Executes Vitest component and lifecycle tests
+   npm run build    # Typechecks and builds production bundle
+   ```
+
+> **Simulated Execution Notice**: All remediation actions in AI Incident Commander are executed in a safe, simulated execution sandbox with zero mutation of real infrastructure. Execution requires explicit human authorization and is labeled as `SIMULATED EXECUTION` in the UI.
+
 
 

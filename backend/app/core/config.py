@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     APP_ENV: str = "development"
     DEBUG: bool = True
     LOG_LEVEL: str = "INFO"
+    # CORS Configuration
+    CORS_ORIGINS: list[str] = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
 
     # Database Settings (PostgreSQL + pgvector)
     DATABASE_URL: str = "postgresql+psycopg://postgres:postgres_password@localhost:5432/ai_incident_commander"

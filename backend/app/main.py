@@ -26,8 +26,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+from fastapi.middleware.cors import CORSMiddleware
+
 # Register central application exception handlers
 register_exception_handlers(app)
+
+# Configure CORS for local frontend origins and dashboard access
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Include Health routes
 app.include_router(health.router, tags=["Health"])

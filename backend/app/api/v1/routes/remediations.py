@@ -6,13 +6,14 @@ Enforces human authorization barriers and simulated safe execution.
 """
 import uuid
 from typing import Optional
-from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi import APIRouter, Depends, status, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.services.remediation_service import RemediationService
 from app.schemas.remediation import (
     RemediationActionCreate,
     RemediationActionResponse,
+    RemediationListResponse,
     RemediationApprovalRequest,
     RemediationRejectionRequest,
     RemediationSubmitRequest,
@@ -22,6 +23,29 @@ from app.remediation.exceptions import RemediationExecutionError
 from app.core.logging import logger
 
 router = APIRouter()
+
+
+@router.get(
+    "",
+    response_model=RemediationListResponse,
+    status_code=status.HTTP_200_OK,
+    summary="List all remediation proposals",
+)
+def list_remediations(
+    status_filter: Optional[str] = Query(None, alias="status", description="Filter by status (PROPOSED, PENDING_APPROVAL, APPROVED, etc.)"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """
+    List all remediation proposals across investigations with optional status filter.
+    """
+    service = RemediationService(db)
+    items, total = service.list_all(skip=skip, limit=limit, status=status_filter)
+    return RemediationListResponse(
+        items=[RemediationActionResponse.model_validate(item) for item in items],
+        total=total,
+    )
 
 
 @router.post(

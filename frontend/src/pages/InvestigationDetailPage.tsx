@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useInvestigation } from '../hooks/useInvestigation';
 import { useIncident } from '../hooks/useIncident';
+import { usePostmortem } from '../hooks/usePostmortem';
+import { useEvaluation } from '../hooks/useEvaluation';
 import { InvestigationHeader } from '../components/investigation/InvestigationHeader';
 import { InvestigationTimeline } from '../components/investigation/InvestigationTimeline';
 import { RootCausePanel } from '../components/investigation/RootCausePanel';
@@ -10,6 +12,8 @@ import { KnowledgeSources } from '../components/investigation/KnowledgeSources';
 import { ToolCallsList } from '../components/investigation/ToolCallsList';
 import { EvidenceList } from '../components/investigation/EvidenceList';
 import { HypothesisList } from '../components/investigation/HypothesisList';
+import { PostmortemSection } from '../components/investigation/PostmortemSection';
+import { EvaluationSection } from '../components/investigation/EvaluationSection';
 import { LoadingState } from '../components/common/LoadingState';
 import { ErrorState } from '../components/common/ErrorState';
 import {
@@ -38,6 +42,22 @@ export const InvestigationDetailPage: React.FC = () => {
     startInvestigation,
     proposeRemediations,
   } = useInvestigation(incidentId);
+
+  const {
+    postmortem,
+    loading: postmortemLoading,
+    generating: postmortemGenerating,
+    error: postmortemError,
+    generate: generatePostmortem,
+  } = usePostmortem(investigation?.investigation_id);
+
+  const {
+    evaluation,
+    loading: evaluationLoading,
+    evaluating: evaluationEvaluating,
+    error: evaluationError,
+    evaluate: evaluateInvestigationAction,
+  } = useEvaluation(investigation?.investigation_id);
 
   if (loading && !investigation) {
     return <LoadingState message="Retrieving investigation telemetry graph..." />;
@@ -222,6 +242,26 @@ export const InvestigationDetailPage: React.FC = () => {
           {activeTab === 'rag' && <KnowledgeSources sources={investigation.retrieved_sources} />}
         </div>
       </div>
+
+      {/* AI Investigation Quality Evaluation */}
+      <EvaluationSection
+        evaluation={evaluation}
+        loading={evaluationLoading}
+        evaluating={evaluationEvaluating}
+        error={evaluationError}
+        onEvaluate={evaluateInvestigationAction}
+        investigationStatus={investigation.status}
+      />
+
+      {/* Incident Postmortem Report */}
+      <PostmortemSection
+        postmortem={postmortem}
+        loading={postmortemLoading}
+        generating={postmortemGenerating}
+        error={postmortemError}
+        onGenerate={generatePostmortem}
+        investigationStatus={investigation.status}
+      />
     </div>
   );
 };

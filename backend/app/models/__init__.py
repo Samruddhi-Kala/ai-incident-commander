@@ -14,6 +14,8 @@ from app.models.remediation_action import RemediationAction
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.audit_log import AuditLog
+from app.models.postmortem import Postmortem
+from app.models.investigation_evaluation import InvestigationEvaluation
 
 __all__ = [
     "Base",
@@ -29,4 +31,6 @@ __all__ = [
     "Document",
     "DocumentChunk",
     "AuditLog",
+    "Postmortem",
+    "InvestigationEvaluation",
 ]

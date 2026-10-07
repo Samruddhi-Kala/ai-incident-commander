@@ -5,14 +5,18 @@ Provides endpoints to trigger and monitor automated LangGraph incident investiga
 """
 import uuid
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.services.incident_service import IncidentService
 from app.services.investigation_service import InvestigationService
 from app.services.remediation_service import RemediationService
+from app.services.postmortem_service import PostmortemService
+from app.services.evaluation_service import EvaluationService
 from app.schemas.remediation import RemediationListResponse, RemediationActionResponse
+from app.schemas.postmortem import PostmortemResponse
+from app.schemas.evaluation import InvestigationEvaluationResponse
 from app.agent.graph import run_investigation_workflow
 from app.agent.schemas import (
     InvestigationRunRequest,
@@ -265,4 +269,96 @@ def propose_investigation_remediations(
         items=[RemediationActionResponse.model_validate(p) for p in proposals],
         total=len(proposals),
     )
+
+
+@router.post(
+    "/{investigation_id}/postmortem",
+    response_model=PostmortemResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Generate or retrieve structured incident postmortem",
+)
+def create_investigation_postmortem(
+    investigation_id: uuid.UUID,
+    regenerate: bool = Query(False, description="Whether to regenerate an existing postmortem"),
+    db: Session = Depends(get_db),
+):
+    """
+    Generates a structured postmortem grounded in persisted investigation data.
+    If a postmortem already exists, returns the existing document unless regenerate=True.
+    """
+    service = PostmortemService(db)
+    try:
+        postmortem = service.generate_postmortem(investigation_id=investigation_id, regenerate=regenerate)
+        return postmortem
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.get(
+    "/{investigation_id}/postmortem",
+    response_model=PostmortemResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Retrieve incident postmortem",
+)
+def get_investigation_postmortem(
+    investigation_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    """
+    Retrieves the persisted postmortem report for an incident investigation session.
+    """
+    service = PostmortemService(db)
+    postmortem = service.get_postmortem(investigation_id=investigation_id)
+    if not postmortem:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No postmortem found for investigation '{investigation_id}'.",
+        )
+    return postmortem
+
+
+@router.post(
+    "/{investigation_id}/evaluate",
+    response_model=InvestigationEvaluationResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Evaluate investigation quality and rigor",
+)
+def evaluate_investigation_endpoint(
+    investigation_id: uuid.UUID,
+    force: bool = Query(False, description="Whether to re-evaluate if already evaluated"),
+    db: Session = Depends(get_db),
+):
+    """
+    Evaluates investigation quality and rigor using transparent, deterministic heuristic engineering metrics.
+    """
+    service = EvaluationService(db)
+    try:
+        evaluation = service.evaluate_investigation(investigation_id=investigation_id, force=force)
+        return evaluation
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.get(
+    "/{investigation_id}/evaluation",
+    response_model=InvestigationEvaluationResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Retrieve investigation evaluation",
+)
+def get_investigation_evaluation_endpoint(
+    investigation_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    """
+    Retrieves the latest quality evaluation for an investigation.
+    """
+    service = EvaluationService(db)
+    evaluation = service.get_evaluation(investigation_id=investigation_id)
+    if not evaluation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No evaluation found for investigation '{investigation_id}'.",
+        )
+    return evaluation
+
 

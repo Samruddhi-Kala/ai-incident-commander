@@ -13,6 +13,8 @@ if TYPE_CHECKING:
     from app.models.hypothesis import Hypothesis
     from app.models.tool_call import ToolCall
     from app.models.remediation_action import RemediationAction
+    from app.models.postmortem import Postmortem
+    from app.models.investigation_evaluation import InvestigationEvaluation
 
 
 class Investigation(Base):
@@ -91,4 +93,16 @@ class Investigation(Base):
         "RemediationAction",
         back_populates="investigation",
         cascade="all, delete-orphan",
+    )
+    postmortem: Mapped[Optional["Postmortem"]] = relationship(
+        "Postmortem",
+        back_populates="investigation",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    evaluations: Mapped[List["InvestigationEvaluation"]] = relationship(
+        "InvestigationEvaluation",
+        back_populates="investigation",
+        cascade="all, delete-orphan",
+        order_by="InvestigationEvaluation.created_at.desc()",
     )

@@ -550,8 +550,70 @@ Vite, Tailwind CSS, and React Router. Complete console interface with:
 - 15 frontend unit and component tests with 100% pass rate (Vitest + Testing Library)
 - Production bundle verification (tsc + vite build passed cleanly)
 
-Not implemented yet:
-Postmortem & Evaluation (Phase 9)
+Phase 9 completed:
+Postmortem & AI Investigation Evaluation: Post-investigation learning and quality audit layer:
+- Grounded incident postmortem generation synthesized strictly from persisted investigation, evidence,
+  and remediation data with incident summary, impact, timeline, root cause, contributing factors, remediation status,
+  lessons learned, and preventive actions. Idempotent duplicate prevention with optional regeneration.
+- Quantitative AI investigation quality evaluation assessing 5 deterministic heuristic engineering dimensions:
+  1. Evidence Support (25% weight): quantity, average relevance score, and verified causal links.
+  2. Hypothesis Quality (20% weight): competing hypothesis formation, diversity, and confidence calibration.
+  3. Verification Rigor (25% weight): hypotheses tested ratio, negative deduction, and supported outcomes.
+  4. RAG Knowledge Relevance (15% weight): active utilization and citation of runbooks and architectural knowledge.
+  5. Tool Execution Efficiency (15% weight): call success rate, redundancy penalties, and volume budgeting.
+- Explainable evaluation reasoning narrative detailing diagnostic strengths and improvement areas.
+- PostgreSQL schema models (Postmortem, InvestigationEvaluation) with Alembic migration 004_postmortem_eval.
+- REST APIs:
+  * POST /api/v1/investigations/{id}/postmortem
+  * GET  /api/v1/investigations/{id}/postmortem
+  * POST /api/v1/investigations/{id}/evaluate
+  * GET  /api/v1/investigations/{id}/evaluation
+  * GET  /api/v1/evaluations
+- Full React frontend visualization:
+  * PostmortemSection with expandable timeline, root cause breakdown, lessons learned, and preventive actions.
+  * EvaluationSection with overall score gauge/badge, 5-subscore progress bars, reasoning narrative, and heuristic disclaimer.
+- 193 backend tests (10 new Phase 9 tests) and 23 frontend unit tests with 100% pass rate.
+```
+
+---
+
+## 📋 Phase 9 — Postmortem & AI Investigation Evaluation
+
+### 1. Grounded Incident Postmortem Architecture
+
+Postmortem reports are synthesized deterministically from persisted investigation telemetry without hallucinated facts:
+- **Incident Summary & Impact**: Extracted from incident metadata, severity level, and impacted service topology.
+- **Milestone Timeline**: Chronologically reconstructed from incident trigger, investigation initialization, step progression, and conclusion timestamps.
+- **Root Cause & Contributing Factors**: Formulated from the agent's verified causal findings and high-relevance telemetry evidence.
+- **Remediation Lineage**: Summarizes formulated proposals, human approval statuses, and execution outcomes.
+- **Lessons Learned & Preventive Actions**: Actionable takeaways and architectural recommendations derived from the observed failure mode.
+
+### 2. Heuristic Engineering Evaluation Methodology
+
+The evaluation layer computes explainable, transparent engineering quality indicators (normalized 0–100):
+
+| Dimension | Weight | Criteria | Scoring Signals |
+| :--- | :--- | :--- | :--- |
+| **Evidence Support** | 25% | Empirical grounding of findings | Evidence volume, relevance score average, causal attachment |
+| **Hypothesis Quality** | 20% | Exploration of competing root causes | Formulation of competing hypotheses, diversity, confidence calibration |
+| **Verification Rigor** | 25% | Verification testing thoroughness | Tested ratio, elimination of invalid hypotheses, definitive resolution |
+| **RAG Relevance** | 15% | Knowledge engine grounding | Retrieval and citation of runbooks, runbook applicability |
+| **Tool Efficiency** | 15% | Diagnostic execution efficiency | Tool success rate, redundancy penalty for duplicate calls, call budgeting |
+
+> **Heuristic Engineering Metric Notice**: Evaluation scores represent transparent heuristic engineering indicators for auditing investigation completeness, evidence grounding, and diagnostic efficiency. They are not statistically validated academic benchmarks or direct proxies for MTTR.
+
+### 3. Verification Commands
+
+```bash
+# Run all backend unit and integration tests (193 tests)
+.\.venv\Scripts\pytest.exe tests/backend
+
+# Run all frontend tests (23 tests across 6 suites)
+cd frontend
+npm run test
+
+# Run production build and typecheck
+npm run build
 ```
 
 ---
